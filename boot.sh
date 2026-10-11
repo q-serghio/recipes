@@ -17,8 +17,16 @@ display_warning() {
     echo -e "$1"
 }
 
+# Ensure /etc/nginx/http.d is a symlink to our config directory. This mirrors
+# the image build step and keeps custom builds working on older Docker builders.
+if [ ! -L /etc/nginx/http.d ]; then
+    echo "Fixing nginx config symlink..."
+    rm -rf /etc/nginx/http.d
+    ln -s /opt/recipes/http.d /etc/nginx/http.d
+fi
+
 # prepare nginx config
-envsubst '$MEDIA_ROOT $STATIC_ROOT $TANDOOR_PORT' < /opt/recipes/http.d/Recipes.conf.template > /opt/recipes/http.d/Recipes.conf
+envsubst '$MEDIA_ROOT $STATIC_ROOT $TANDOOR_PORT' < /opt/recipes/http.d/Recipes.conf.template > /etc/nginx/http.d/Recipes.conf
 
 # start nginx early to display error pages with writable location as non-root
 echo "Starting nginx"

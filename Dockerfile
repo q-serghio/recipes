@@ -1,3 +1,16 @@
+FROM node:22-alpine3.23 AS frontend
+
+WORKDIR /build
+
+# Match the official release workflow so a local Docker build contains the
+# production Vite bundle as well as the backend source.
+RUN corepack enable
+COPY vue3/package.json vue3/yarn.lock ./vue3/
+RUN cd vue3 && yarn install --frozen-lockfile
+COPY vue3 ./vue3
+COPY cookbook/locale ./cookbook/locale
+RUN cd vue3 && yarn build
+
 FROM python:3.13-alpine3.23
 
 #Install all dependencies.
@@ -29,17 +42,13 @@ RUN apk add --no-cache --virtual .build-deps gcc musl-dev postgresql-dev zlib-de
 
 #Copy project and execute it.
 COPY . ./
+COPY --from=frontend /build/cookbook/static/vue3 ./cookbook/static/vue3
 
-RUN <<EOF
-    # delete default nginx config and link it to tandoors config
-    rm -rf /etc/nginx/http.d
-    ln -s /opt/recipes/http.d /etc/nginx/http.d
-    # allow all write/read but set sticky bit to restrict non-root to only create files (conf templating in boot.sh)
-    chmod 1777 /opt/recipes/http.d/
-    # create symlinks to access and error log to show them on stdout
-    ln -sf /dev/stdout /var/log/nginx/access.log
+RUN rm -rf /etc/nginx/http.d && \
+    ln -s /opt/recipes/http.d /etc/nginx/http.d && \
+    chmod 1777 /opt/recipes/http.d/ && \
+    ln -sf /dev/stdout /var/log/nginx/access.log && \
     ln -sf /dev/stderr /var/log/nginx/error.log
-EOF
 
 # commented for now https://github.com/TandoorRecipes/recipes/issues/3478
 #HEALTHCHECK --interval=30s \
